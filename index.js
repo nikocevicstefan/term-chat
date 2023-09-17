@@ -4,7 +4,7 @@ import { program } from 'commander';
 import chalk from 'chalk';
 import fs from 'fs';
 import ora from 'ora';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import inquirer from 'inquirer';
 import path from 'path';
 import axios from 'axios';
@@ -82,18 +82,14 @@ program
                 return;
             }
 
-            // If not in a `script` session, start one
             if (!fs.existsSync(LOG_DIR)) {
                 fs.mkdirSync(LOG_DIR, { recursive: true });
             }
-            exec(`script ${LOG_FILE_PATH}`, (scriptError) => {
-                if (scriptError) {
-                    console.error('Failed to start the script session:', scriptError);
-                    return;
-                }
 
-                console.log('Started capturing terminal session. Type your commands...');
-                console.log('When done, type "exit" to end the session and return to your normal terminal.');
+            // If not in a `script` session, start one
+            const scriptProcess = spawn('script', [LOG_FILE_PATH], { stdio: 'inherit' });
+            scriptProcess.on('exit', () => {
+                console.log('Script session ended.');
             });
         });
     });
@@ -132,42 +128,44 @@ program
         }
 
         // Read the log file
-        const logContent = fs.readFileSync(LOG_FILE_PATH, 'utf-8').split('\n').filter(Boolean);
+        const rawLogContent = fs.readFileSync(LOG_FILE_PATH, 'utf-8');
+        // Split the log content into lines
+        const lines = rawLogContent.split('\n').filter(Boolean);
+        console.log('Lines:', lines);
 
-        // Extract the last command and its output
         let command = null;
         let output = [];
-        let promptCount = 0;
+        let foundPrompt = false;
 
-        for (let i = logContent.length - 1; i >= 0; i--) {
-            // Check if the line ends with the $ prompt and has escape sequences
-            if (/^.*\$\s*$/.test(logContent[i]) && /\^\[/.test(logContent[i])) {
-                promptCount++;
-                if (promptCount == 1) {
-                    continue; // Skip the prompt after the last command
-                } else if (promptCount == 2) {
-                    // We've reached the second prompt (from the end), get the previous line as the command
-                    command = logContent[i - 1];
+        // Start from the end of the log and move upwards
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i];
+        
+            // Check if the line matches the terminal prompt pattern
+            if (line.includes(' % ') || line.includes(' $ ')) {
+                if (foundPrompt) {  // If we already found a prompt before, this is the beginning of the command
+                    command = lines[i - 1];
                     break;
                 }
-            } else if (promptCount == 1) {
-                // Capture the output lines; we'll reverse them later
-                output.push(logContent[i]);
+                foundPrompt = true;
+            } else if (foundPrompt) {  // If we found the prompt and are still collecting output
+                output.unshift(line);  // Add the output line to the beginning of the array to maintain order
             }
         }
-
-        output = output.reverse().join('\n');
-
+        
         console.log('Last Command:', command);
         console.log('Output:', output);
 
         const prompt = `Command: ${command}\nOutput: ${output}\nGive me an explanation for this terminal error:`;
+        console.log('Prompt:', prompt);
         const explanation = await askOpenAI(prompt, 100);
         if (!explanation) {
             console.error('Sorry, something went wrong.');
             return;
         }
-        console.log('Explanation:', stylizeCodeBlocks(responseMessage));
+        console.log('='.repeat(50));
+        console.log('Explanation:', stylizeCodeBlocks(explanation));
+        console.log('='.repeat(50));
     });
 
 
@@ -336,6 +334,17 @@ function stylizeCodeBlocks(message) {
     }
 
     return result;
+}
+
+
+function preprocessLog(logContent) {
+    // Remove escape sequences
+    let cleanedContent = logContent.replace(/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]/g, '');
+    console.log('Cleaned content:', cleanedContent);
+    // Any other preprocessing can be added here
+    // ...
+
+    return cleanedContent;
 }
 
 
