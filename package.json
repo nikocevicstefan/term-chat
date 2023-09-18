@@ -10,15 +10,18 @@
     "os": "^0.1.2",
     "path": "^0.12.7"
   },
-  "name": "term-chat",
+  "name": "gpt-helper",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "bin" : {
+    "gpthelp": "./index.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "Reads last terminal error from logs and gives you a solution by connecting to OpenAI's API."
 }

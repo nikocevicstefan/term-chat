@@ -10,10 +10,10 @@ import path from 'path';
 import axios from 'axios';
 import os from 'os';
 
-const CONFIG_DIR = path.join(os.homedir(), '.mycli');
+const CONFIG_DIR = path.join(os.homedir(), '.gpt-helper');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
-const LOG_DIR = path.join(os.homedir(), '.mycli_logs');
+const LOG_DIR = path.join(os.homedir(), '.gpt-helper_logs');
 const LOG_FILE_PATH = path.join(LOG_DIR, 'my_terminal_session.log');
 
 
@@ -153,11 +153,7 @@ program
             }
         }
         
-        console.log('Last Command:', command);
-        console.log('Output:', output);
-
         const prompt = `Command: ${command}\nOutput: ${output}\nGive me an explanation for this terminal error:`;
-        console.log('Prompt:', prompt);
         const explanation = await askOpenAI(prompt, 100);
         if (!explanation) {
             console.error('Sorry, something went wrong.');
